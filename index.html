@@ -1,0 +1,322 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <style>
+    #app {
+      width: 1366px;
+      margin: 30px auto 0;
+    }
+  </style>
+</head>
+<div id="app">
+  <form ref="search-form" width="180px">
+    <span>查询内容</span>
+    <input v-model="search" style="width: 40%;margin-right: 20px"></input>
+    <button type="button" @click="searchFn">查询</button>
+    <button type="button" @click="searchAllFn">查询所有</button>
+    <button type="button" @click="addInfoFn">添加</button>
+
+    <a style="margin-left:20px" href="webCode.txt" download="">点击下载源码</a>
+  </form>
+
+
+  <table style="width: 100%">
+    <tr>
+      <th width="180px">
+        学号
+      </th>
+      <th width="180px">
+        姓名
+      </th>
+      <th width="180px">
+        科目
+      </th>
+      <th width="180px">
+        分数
+      </th>
+      <th width="180px">
+        状态
+      </th>
+      <th width="180px">
+        状态
+      </th>
+    </tr>
+
+    <tr v-for="item in tableData">
+      <td>{{item.stuId}}</td>
+      <td>{{item.name}}</td>
+      <td>{{item.subjects}}</td>
+      <td>{{item.score}}</td>
+      <td>
+        <button @click="editInfoFn(item.stuId)">编辑</button>
+      </td>
+      <td>
+        <button @click="delInfoFn(item.stuId)">删除</button>
+      </td>
+    </tr>
+  </table>
+
+  <el-dialog @close='closeDialog' width="30%" title="人员信息" :visible.sync="dialogFormVisible"
+             :close-on-click-modal="false">
+    <el-form ref="info-from" :model="infoForm">
+      <el-form-item label="学号">
+        <el-input v-model="infoForm.stuId" :disabled="!isAdd"></el-input>
+      </el-form-item>
+      <el-form-item label="姓名">
+        <el-input v-model="infoForm.name"></el-input>
+      </el-form-item>
+      <el-form-item label="科目">
+        <el-input v-model="infoForm.subjects"></el-input>
+      </el-form-item>
+      <el-form-item label="分数">
+        <el-input v-model="infoForm.score"></el-input>
+      </el-form-item>
+      <el-form-item>
+        <el-button v-if="isAdd" type="primary" :plain="true" @click="confirmFn">确定</el-button>
+        <el-button v-else type="primary" :id="sId" ref="updateBtn" :plain="true" @click="updateInfoFn">更新
+        </el-button>
+        <el-button @click="cancelFn">取消</el-button>
+      </el-form-item>
+    </el-form>
+  </el-dialog>
+</div>
+
+<body>
+<script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.9/vue.js"></script>
+
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+window.onload = function () {
+
+  new Vue({
+    el: '#app',
+    data: function () {
+      return {
+        search: '',
+        sid: -1,
+        isAdd: true,
+        isValid: true,
+        dialogFormVisible: false,
+        infoForm: {
+          stuId: '',
+          name: '',
+          subjects: '',
+          score: null
+        },
+        tableData: []
+      }
+    },
+    created: function () {
+      console.log('vue 示例创建之后的生命周期 --- 系统即将运行...')
+    },
+    mounted: function () {
+      console.log('vue 挂载数据到页面的声明周期 --- 此时可以看到页面学员数据信息')
+      this.showInfoFn()
+    },
+    methods: {
+
+      confirmFn: function () {
+        this.isValid = true
+        if (this.infoForm.stuId === '' || isNaN(this.infoForm.stuId)) {
+          this.$message.error('请输入7位学员学号示例: 2020001')
+          this.infoForm.stuId = ''
+          this.isValid = false
+        } else if (this.infoForm.name === '') {
+          this.$message.error('请输入学员名称示例: 张三')
+          this.isValid = false
+        } else if (this.infoForm.subjects === '') {
+          this.$message.error('请输入学员科目示例: 大学英语')
+          this.isValid = false
+        } else if (isNaN(this.infoForm.score) || this.infoForm.score <= 0 || this.infoForm.score > 100) {
+          this.infoForm.score = 0
+          this.$message.error('请输入学员分数示例: 0-100之间')
+          this.isValid = false
+        }
+
+        if (this.isValid) {
+          let obj = {}
+          obj.stuId = this.infoForm.stuId
+          obj.name = this.infoForm.name
+          obj.subjects = this.infoForm.subjects
+          obj.score = this.infoForm.score
+
+          let tempData = JSON.parse(localStorage.getItem('userList')) || []
+          if (tempData.length === 0) {
+            tempData.push(obj)
+            localStorage.setItem('userList', JSON.stringify(tempData))
+            this.$message({
+              showClose: true,
+              message: '学员信息添加成功',
+              type: 'success'
+            })
+            this.dialogFormVisible = false
+            this.showInfoFn()
+            return
+          }
+          if (this.uniqueFn(tempData)) {
+            this.$message({
+              showClose: true,
+              message: '学员学号重复,添加失败',
+              type: 'warning'
+            })
+            return false
+          } else {
+            tempData.push(obj)
+            localStorage.setItem('userList', JSON.stringify(tempData))
+            this.$message({
+              showClose: true,
+              message: '学员信息添加成功',
+              type: 'success'
+            })
+            this.dialogFormVisible = false
+            this.showInfoFn()
+          }
+        }
+      },
+
+      uniqueFn: function (tempData) {
+        let unique = false
+        for (let i = 0; i < tempData.length; i++) {
+          if (tempData[i].stuId === this.infoForm.stuId) {
+            unique = true
+          }
+        }
+        return unique
+      },
+
+      cancelFn: function () {
+        this.dialogFormVisible = false
+        this.infoForm = {}
+      },
+
+      addInfoFn: function () {
+        this.isAdd = true
+        this.dialogFormVisible = !this.dialogFormVisible
+      },
+
+      searchAllFn: function () {
+        this.showInfoFn()
+      },
+
+      searchFn: function () {
+        if (this.search.trim() === '' || this.search.trim() === null) {
+          this.$message({
+            message: '请输入要查询的条件',
+            type: 'warning',
+            duration: 1000
+          })
+          return false
+        }
+        let tempData = JSON.parse(localStorage.getItem('userList')) || []
+        if (tempData.length === 0) {
+          this.$message({
+            message: '数据库为空，请先添加学员数据',
+            type: 'warning'
+          })
+          return false
+        }
+        let rowData = null
+        for (let i = 0; i < tempData.length; i++) {
+          if (tempData[i].stuId === this.search || tempData[i].name === this.search) {
+            rowData = tempData[i]
+          }
+        }
+
+        if (rowData === null) {
+          this.$message({
+            message: '未找到该学员 --- 请确认查询信息是否正确',
+            type: 'warning',
+            duration: 1000
+          })
+          return false
+        } else {
+          this.tableData = []
+          this.tableData.push(rowData)
+        }
+      },
+
+      showInfoFn: function () {
+        this.tableData = JSON.parse(localStorage.getItem('userList'))
+      },
+
+      editInfoFn: function (index) {
+        this.isAdd = false
+        this.dialogFormVisible = !this.dialogFormVisible
+        let tempData = JSON.parse(localStorage.getItem('userList'))
+        for (let i = 0; i < tempData.length; i++) {
+          if (tempData[i].stuId === index) {
+            this.infoForm = tempData[i]
+            this.sId = tempData[i].stuId
+          }
+        }
+      },
+
+      updateInfoFn: function () {
+
+        let tempData = JSON.parse(localStorage.getItem('userList'))
+        for (let i = 0; i < tempData.length; i++) {
+
+          if (tempData[i].stuId === this.$refs.updateBtn.$el.id) {
+            tempData[i].name = this.infoForm.name
+            tempData[i].subjects = this.infoForm.subjects
+            if (isNaN(this.infoForm.score) || this.infoForm.score <= 0 || this.infoForm.score > 100) {
+              this.infoForm.score = 0
+              this.$message.error('请输入学员分数示例: 0-100之间')
+              return false
+            } else {
+              tempData[i].score = this.infoForm.score
+            }
+          }
+        }
+        localStorage.setItem('userList', JSON.stringify(tempData))
+        this.dialogFormVisible = !this.dialogFormVisible
+        this.$message({
+          showClose: true,
+          message: '更新学员信息成功',
+          type: 'success'
+        })
+        this.showInfoFn()
+      },
+
+      delInfoFn: function (index) {
+        let tempId = index
+        let tempData = JSON.parse(localStorage.getItem('userList')) || []
+
+        this.$confirm('是否删除该学员信息, 是否继续?', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          this.$message({
+            type: 'success',
+            message: '删除成功!'
+          })
+          for (let i = 0; i < tempData.length; i++) {
+            if (tempData[i].stuId === tempId) {
+              tempData.splice(tempData.indexOf(tempData[i]), 1)
+            }
+          }
+          localStorage.setItem('userList', JSON.stringify(tempData))
+          rows.splice(index, 1)
+        }).catch(() => {
+          this.$message({
+            type: 'info',
+            message: '已取消删除'
+          })
+        })
+      },
+
+      closeDialog: function () {
+        this.infoForm = {}
+      }
+    }
+  })
+}
+</script>
+</body>
+
+</html>
